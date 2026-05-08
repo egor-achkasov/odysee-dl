@@ -33,6 +33,7 @@ pub fn run(config: config::Config, tx: std::sync::mpsc::Sender<Event>) -> Result
             Ok(()) => tx.send(Event::DownloadPostFinished(post.name.clone())).ok(),
             Err(e) => tx.send(Event::DownloadPostFailed(post.name.clone(), e.to_string())).ok(),
         };
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
     tx.send(Event::Done).ok();
