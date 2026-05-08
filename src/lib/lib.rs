@@ -25,9 +25,14 @@ pub fn run(config: config::Config, tx: std::sync::mpsc::Sender<Event>) -> Result
     std::fs::create_dir_all(&config.output_dir)?;
     for post in posts {
         tx.send(Event::DownloadPostStarted(post.name.clone())).ok();
-        if config.resume && config.output_dir.join(&post.filename).exists() {
-            tx.send(Event::DownloadPostSkipped(post.name.clone())).ok();
-            continue;
+        if config.resume {
+            let local_path = config.output_dir.join(&post.filename);
+            if let Ok(meta) = std::fs::metadata(&local_path) {
+                if post.content_length().map_or(false, |remote| meta.len() == remote) {
+                    tx.send(Event::DownloadPostSkipped(post.name.clone())).ok();
+                    continue;
+                }
+            }
         }
         match post.download(&config.output_dir) {
             Ok(()) => tx.send(Event::DownloadPostFinished(post.name.clone())).ok(),

@@ -31,6 +31,22 @@ impl Post {
         Ok(Post { name, filename, streaming_url })
     }
 
+    pub fn content_length(&self) -> Option<u64> {
+        ureq::head(&self.streaming_url)
+            .header("Referer", "https://odysee.com/")
+            .header("Origin", "https://odysee.com")
+            .call()
+            .ok()
+            .and_then(|r| {
+                r.headers()
+                    .get("content-length")?
+                    .to_str()
+                    .ok()?
+                    .parse()
+                    .ok()
+            })
+    }
+
     pub fn download(&self, dir: &std::path::Path) -> Result<(), Error> {
         let path = dir.join(&self.filename);
         let mut response = ureq::get(&self.streaming_url)
