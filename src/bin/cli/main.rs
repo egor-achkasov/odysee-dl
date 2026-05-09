@@ -59,9 +59,10 @@ fn parse_args() -> Result<Config, ParseArgsErr> {
 
     let mut output_dir = std::path::PathBuf::from(".");
     let mut resume = false;
+    let mut url: Option<String> = None;
     let mut i = 1;
 
-    while i < args.len() - 1 {
+    while i < args.len() {
         match args[i].as_str() {
             "-h" | "--help" => {
                 println!("{}", HELP);
@@ -69,7 +70,7 @@ fn parse_args() -> Result<Config, ParseArgsErr> {
             }
             "-d" | "--dir" => {
                 i += 1;
-                if i >= args.len() - 1 {
+                if i >= args.len() {
                     return Err(ParseArgsErr::MissingDirValue);
                 }
                 output_dir = std::path::PathBuf::from(&args[i]);
@@ -77,12 +78,15 @@ fn parse_args() -> Result<Config, ParseArgsErr> {
             "-r" | "--resume" => {
                 resume = true;
             }
+            arg if !arg.starts_with('-') => {
+                url = Some(arg.to_string());
+            }
             _ => return Err(ParseArgsErr::UnknownOption(args[i].clone())),
         }
         i += 1;
     }
 
-    let url = args.last().unwrap().to_string();
+    let url = url.ok_or(ParseArgsErr::MissingUrl)?;
     Ok(Config { url, output_dir, resume })
 }
 
