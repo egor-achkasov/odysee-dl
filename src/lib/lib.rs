@@ -11,7 +11,7 @@ pub fn run(config: config::Config, tx: std::sync::mpsc::Sender<Event>) -> Result
     let channel = url_to_channel(&config.url)?;
 
     tx.send(Event::GetPostsStarted(config.url.clone())).ok();
-    let posts = match get_posts(&channel) {
+    let posts = match get_posts(&channel, &tx) {
         Ok(posts) => {
             tx.send(Event::GetPostsFinished(config.url.clone())).ok();
             posts
@@ -28,13 +28,13 @@ pub fn run(config: config::Config, tx: std::sync::mpsc::Sender<Event>) -> Result
         if config.resume {
             let local_path = config.output_dir.join(&post.filename);
             if let Ok(meta) = std::fs::metadata(&local_path) {
-                if post.content_length().map_or(false, |remote| meta.len() == remote) {
+                if post.content_length(&tx).map_or(false, |remote| meta.len() == remote) {
                     tx.send(Event::DownloadPostSkipped(post.name.clone())).ok();
                     continue;
                 }
             }
         }
-        match post.download(&config.output_dir) {
+        match post.download(&config.output_dir, &tx) {
             Ok(()) => tx.send(Event::DownloadPostFinished(post.name.clone())).ok(),
             Err(e) => tx.send(Event::DownloadPostFailed(post.name.clone(), e.to_string())).ok(),
         };
@@ -55,7 +55,7 @@ fn url_to_channel(url: &str) -> Result<String, Error> {
     Ok(channel.to_string())
 }
 
-fn get_posts(channel: &str) -> Result<Vec<Post>, Error> {
+fn get_posts(channel: &str, tx: &std::sync::mpsc::Sender<Event>) -> Result<Vec<Post>, Error> {
     let mut page = 1usize;
     let mut posts = Vec::new();
 
@@ -70,11 +70,17 @@ fn get_posts(channel: &str) -> Result<Vec<Post>, Error> {
             }
         });
 
-        let response: serde_json::Value = ureq::post("https://api.na-backend.odysee.com/api/v1/proxy")
-            .header("Content-Type", "application/json")
-            .send(serde_json::to_vec(&body)?)?
-            .body_mut()
-            .read_json()?;
+        let body_bytes = serde_json::to_vec(&body)?;
+        let response: serde_json::Value = post::with_retry(
+            || {
+                ureq::post("https://api.na-backend.odysee.com/api/v1/proxy")
+                    .header("Content-Type", "application/json")
+                    .send(body_bytes.clone())
+            },
+            || { tx.send(Event::RateLimited("API".to_string())).ok(); },
+        )?
+        .body_mut()
+        .read_json()?;
 
         let items = response["result"]["items"]
             .as_array()

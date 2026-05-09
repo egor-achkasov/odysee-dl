@@ -108,6 +108,7 @@ fn render_event(event: &Event) {
         Event::DownloadPostFailed(_, err) => println!(" Failed: {}", err),
         Event::DownloadPostSkipped(_) => println!(" Skipped"),
         Event::DownloadPostFinished(_) => println!(" Done"),
+        Event::RateLimited(ctx) => println!("\nRate limited ({}), waiting 60s...", ctx),
         Event::Done => println!("Done."),
     }
 }

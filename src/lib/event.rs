@@ -13,6 +13,7 @@ pub enum Event {
     DownloadPostFailed(String, String), // post name, error message
     DownloadPostSkipped(String), // post name (already exists, skipping)
     DownloadPostFinished(String), // post name
+    RateLimited(String), // context (post name or "API")
 
     Done,
 }
